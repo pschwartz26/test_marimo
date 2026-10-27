@@ -28,18 +28,8 @@ def _():
 
 @app.cell
 def _(pd):
-    # import subprocess
-    # from pathlib import Path
-    
-    # subprocess.run(
-    #     ["git", "clone", "https://github.com/pschwartz26/test_marimo.git"],
-    #    check=True,
-    # )
-    
-    # repo = Path("test_marimo")
-    # pkl = (repo / "uranus_200.pkl")
-    # df = pd.read_pickle(pkl)
-    df = pd.read_pickle("https://github.com/pschwartz26/test_marimo/blob/main/uranus_200.pkl")
+    url = "https://raw.githubusercontent.com/pschwartz26/test_marimo/main/uranus_200.pkl"
+    df = pd.read_pickle(url)
     return (df,)
 
 
@@ -62,20 +52,21 @@ def _(df, plt, sns):
     _metrics = ["Quaternion Errors", "Angle Errors", "Omega Errors"]
     _group_order = ["True", "Fixed", "Adapt"]
     _palette = {"True": "#4f46e5", "Fixed": "#0891b2", "Adapt": "#b45309"}
-
+    
     for _ax, _metric in zip(_axes, _metrics):
         sns.violinplot(
             data=df,
             x="Group",
             y=_metric,
             order=_group_order,
+            hue = "Group",
             palette=_palette,
             inner="quartile",
             ax=_ax,
         )
         _ax.set_title(_metric)
         _ax.set_xlabel("Group")
-
+    
     _fig.suptitle("Trajectory Error Comparison by Group", fontsize=18, fontweight="bold")
     _fig.tight_layout()
     plt.gca()
