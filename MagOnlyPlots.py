@@ -31,10 +31,10 @@ def _(pd):
     import subprocess
     from pathlib import Path
     
-    # subprocess.run(
-    #     ["git", "clone", "https://github.com/pschwartz26/test_marimo.git"],
-    #     check=True,
-    # )
+    subprocess.run(
+        ["git", "clone", "https://github.com/pschwartz26/test_marimo.git"],
+       check=True,
+    )
     
     repo = Path("test_marimo")
     pkl = (repo / "uranus_200.pkl")
