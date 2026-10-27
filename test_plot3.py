@@ -45,7 +45,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    angle_threshold
+    angle_threshold.value*200
     return
     
 @app.cell(hide_code=True)
