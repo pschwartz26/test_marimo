@@ -13,7 +13,7 @@ __generated_with = "0.24.2"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
 
@@ -25,7 +25,7 @@ def _():
     return mo, pd, plt, sns
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(pd):
     url = "https://raw.githubusercontent.com/pschwartz26/test_marimo/main/uranus_200.pkl"
     df = pd.read_pickle(url)
@@ -43,7 +43,11 @@ def _(mo):
         mo.md("Success requires mean angle of stable samples and rate errors below their thresholds. Stability requires the final contiguous segment to stay within both tolerances of the tail means for at least the requested sample count. Summary statistics always use full trajectories, independent of the plot time window.")])
     return
 
-
+@app.cell(hide_code=True)
+def _(mo):
+    angle_threshold
+    return
+    
 @app.cell(hide_code=True)
 def _(df, plt, sns):
     _fig, _axes = plt.subplots(1, 3, figsize=(16, 6))
