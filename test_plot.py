@@ -28,17 +28,18 @@ def _():
 
 @app.cell
 def _(pd):
-    import subprocess
-    from pathlib import Path
+    # import subprocess
+    # from pathlib import Path
     
-    subprocess.run(
-        ["git", "clone", "https://github.com/pschwartz26/test_marimo.git"],
-       check=True,
-    )
+    # subprocess.run(
+    #     ["git", "clone", "https://github.com/pschwartz26/test_marimo.git"],
+    #    check=True,
+    # )
     
-    repo = Path("test_marimo")
-    pkl = (repo / "uranus_200.pkl")
-    df = pd.read_pickle(pkl)
+    # repo = Path("test_marimo")
+    # pkl = (repo / "uranus_200.pkl")
+    # df = pd.read_pickle(pkl)
+    df = pd.read_pickle(mo.notebook_location() / / "uranus_200.pkl")
     return (df,)
 
 
