@@ -1,10 +1,9 @@
 # /// script
-# requires-python = ">=3.13"
 # dependencies = [
-#    "numpy>=2.5.3",
-#    "matplotlib>=3.11.2",
-#    "pandas>=3.0.6",
-#    "seaborn>=0.13.2",
+#     "numpy",
+#     "matplotlib",
+#     "pandas",
+#     "seaborn",
 # ]
 # ///
 
