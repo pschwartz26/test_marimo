@@ -1,7 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "raddo[cuda13]==0.1.4",
+#    "numpy>=2.5.3",
+#    "matplotlib>=3.11.2",
+#    "pandas>=3.0.6",
+#    "seaborn>=0.13.2",
 # ]
 # ///
 
@@ -17,9 +20,6 @@ with app.setup:
     os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
 
     import pandas as pd
-
-    from raddo.utils import TrajectoryGenerator
-    from raddo.dynamics import OrbitDynamics, MagnetorquerDynamics
 
     sns.set_theme(context='paper', style='whitegrid', font='serif', font_scale=1.7)
 
@@ -38,13 +38,6 @@ def _():
         token=_token,
     )
     return (fs,)
-
-
-@app.cell
-def _():
-    spacecraft_dynamics = MagnetorquerDynamics()
-    system = TrajectoryGenerator(dynamics=spacecraft_dynamics, dt=0.1)
-    return (system,)
 
 
 @app.cell
@@ -69,7 +62,7 @@ def _(angle_tolerance, omega_tolerance, tail_samples):
 
 @app.cell(hide_code=True)
 def _(df_list, system):
-    system.plot_violin_and_bar(df_list=df_list)#, angle_threshold=angle_threshold,omega_threshold=omega_threshold,angle_stability_tol=angle_tol, omega_stability_tol=omega_tol, tail_length=tail_length, angle_hist_max=angle_hist_max, omega_hist_max=omega_hist_max, verbose=True, dataset_labels=labels
+    uranus_df_200
     return
 
 
