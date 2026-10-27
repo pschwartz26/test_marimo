@@ -79,6 +79,7 @@ def _(df, plt, sns):
     _fig.suptitle("Trajectory Error Comparison by Group", fontsize=18, fontweight="bold")
     _fig.tight_layout()
     plt.gca()
+    _fig
 
     return
 
