@@ -39,7 +39,7 @@ def _(pd):
     # repo = Path("test_marimo")
     # pkl = (repo / "uranus_200.pkl")
     # df = pd.read_pickle(pkl)
-    df = pd.read_pickle(mo.notebook_location() / / "uranus_200.pkl")
+    df = pd.read_pickle("https://github.com/pschwartz26/test_marimo/blob/main/uranus_200.pkl")
     return (df,)
 
 
