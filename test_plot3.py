@@ -41,17 +41,14 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Attitude Slew Explorer
-
     Interactive analysis of slew-maneuver results for the **Earth** and **Uranus** datasets
-    across several horizons, plus a **torque vs. dipole** comparison. Every section has its own
-    controls, and plots and summaries update as you change them.
+    across several horizons, plus a **torque vs. dipole** comparison. 
 
     | Section | What it shows |
     |:--|:--|
     | **1 · Final-state statistics** | Violin plots and success / stability statistics, Earth vs. Uranus |
-    | **2 · Error trajectories** | Angle and angular-velocity error histories, Earth vs. Uranus |
-    | **3 · Torque vs. dipole** | Angle and angular-velocity error histories for the torque comparison |
+    | **2 · Error trajectories** | Angle and angular-velocity error trajectories, Earth vs. Uranus |
+    | **3 · Torque vs. dipole** | Angle and angular-velocity error trajectories for the torque comparison |
     """)
     return
 
