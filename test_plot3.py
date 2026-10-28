@@ -13,9 +13,6 @@ __generated_with = "0.24.2"
 app = marimo.App(width="full", app_title="Attitude Slew Explorer")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Setup: imports, remote plotting module, theme
-# ─────────────────────────────────────────────────────────────────────────────
 @app.cell(hide_code=True)
 def _():
     import types
@@ -59,31 +56,70 @@ def _(mo):
     return
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Data
-# ─────────────────────────────────────────────────────────────────────────────
 @app.cell(hide_code=True)
-def _(mo, pd):
-    _BASE = "https://raw.githubusercontent.com/JHU-ACEL/uranus-mpc-data/main/data"
+def _(mo, np, pd):
+    import io
+    import warnings
+    from urllib.request import urlopen as _urlopen
 
+    # Compact, pre-processed copies of the data (created once, offline, with
+    # build_compact_data.py). They are far smaller and faster to load than the original
+    # pickles. After uploading the .npz files somewhere that serves them with CORS
+    # (e.g. GitHub -> raw.githubusercontent.com), put the folder URL here.
+    # Leave as None to fall back to the original pickles.
+    COMPACT_BASE = "https://github.com/JHU-ACEL/uranus-mpc-data/blob/main/compact"  # e.g. "https://raw.githubusercontent.com/<user>/<repo>/main/compact"
+
+    PICKLE_BASE = "https://raw.githubusercontent.com/JHU-ACEL/uranus-mpc-data/main/data"
     HORIZONS = [50, 100, 150, 200, 250]
-    _files = {
-        f"{_body}_{_h}": f"{_BASE}/{_body}_{_h}.pkl"
-        for _body in ("earth", "uranus")
-        for _h in HORIZONS
-    }
-    _files["torque_df"] = f"{_BASE}/torque_v_dipole.pkl"
 
-    with mo.status.spinner(title="Loading datasets…"):
-        datasets = {_name: pd.read_pickle(_url) for _name, _url in _files.items()}
-    return HORIZONS, datasets
+    def _frame_from_compact(z):
+        """Rebuild the long-format DataFrame the plotting functions expect."""
+        groups = [str(g) for g in z["groups"]]
+        angle, omega = z["angle"], z["omega"]
+        n_groups, batch, n_steps = angle.shape
+        n_rows = n_groups * batch * n_steps
+        return pd.DataFrame({
+            "Group": np.repeat(np.array(groups), batch * n_steps),
+            "Time": np.tile(np.asarray(z["time"], dtype=float), n_groups * batch),
+            "Quaternion Errors": np.full(n_rows, np.nan),  # not stored, never plotted
+            "Angle Errors": angle.reshape(-1).astype(float),
+            "Omega Errors": omega.reshape(-1).astype(float),
+        })
+
+    def _load(name, pickle_name, drop_full):
+        df = None
+        if COMPACT_BASE:
+            try:
+                with _urlopen(f"{COMPACT_BASE.rstrip('/')}/{name}.npz") as resp:
+                    df = _frame_from_compact(np.load(io.BytesIO(resp.read()), allow_pickle=False))
+            except Exception as err:  # fall back rather than break the page
+                warnings.warn(f"Compact data for {name!r} unavailable ({err}); using the pickle instead.")
+        if df is None:
+            df = pd.read_pickle(f"{PICKLE_BASE}/{pickle_name}")
+        return df.loc[df["Group"] != "Full"] if drop_full else df
+
+    _cache = {}
+
+    def get_df(body, horizon):
+        """Earth or Uranus trajectories for one horizon ("Full" group removed). Cached."""
+        key = f"{body}_{horizon}"
+        if key not in _cache:
+            with mo.status.spinner(title=f"Loading {body.title()} · N = {horizon}…"):
+                _cache[key] = _load(key, f"{key}.pkl", drop_full=True)
+        return _cache[key]
+
+    def get_torque():
+        """Torque-vs-dipole trajectories (all groups, as stored). Cached."""
+        if "torque_df" not in _cache:
+            with mo.status.spinner(title="Loading torque data…"):
+                _cache["torque_df"] = _load("torque_df", "torque_v_dipole.pkl", drop_full=False)
+        return _cache["torque_df"]
+
+    return HORIZONS, get_df, get_torque
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Shared helpers
-# ─────────────────────────────────────────────────────────────────────────────
 @app.cell(hide_code=True)
-def _(mo, np, plot_utils):
+def _(mo, np, plot_utils, plt):
     _THRESHOLD_LABEL = r"$\text{threshold}$"  # label plot_costs gives its own threshold line
     _METRICS = ("Principal angle error", "Angular velocity error")
 
@@ -201,12 +237,46 @@ def _(mo, np, plot_utils):
         # Separate groups are paged through in a carousel; a single block needs no wrapper.
         return mo.carousel(blocks) if len(blocks) > 1 else blocks[0]
 
-    return cost_layout, describe_view, infer_shape, render_costs, select_groups
+    def cost_view(frames, *, compare_groups, batch_idx, angle_thr, omega_thr, t_window,
+                  plot_stats, show_thresholds, fit_y, label_sources=True):
+        """Build the cost-plot view for {source: DataFrame}, deferring figure creation.
+
+        Figures are the expensive part (especially in the browser), so when groups are shown
+        separately each carousel slide is wrapped in mo.lazy and only drawn when it is first
+        visible, instead of drawing every group up front.
+        """
+
+        def _build(group_names):
+            per_source = {}
+            for source, df in frames.items():
+                sub = df if group_names is None else select_groups(df, group_names)
+                batch, n_steps = infer_shape(sub)
+                per_source[source] = render_costs(
+                    sub, batch_size=batch, n_steps=n_steps,
+                    batch_idx=None if batch_idx is None else min(batch_idx, batch - 1),
+                    angle_thr=angle_thr, omega_thr=omega_thr, t_window=t_window,
+                    plot_stats=plot_stats, compare_groups=compare_groups,
+                    show_thresholds=show_thresholds, fit_y=fit_y,
+                )
+            layout = cost_layout(per_source, label_sources)
+            for pairs in per_source.values():
+                for pair in pairs.values():
+                    for fig in pair:
+                        plt.close(fig)
+            return layout
+
+        if compare_groups:
+            return _build(None)
+        groups = list(dict.fromkeys(g for df in frames.values() for g in df["Group"].unique()))
+        if len(groups) == 1:
+            return _build(groups)
+        return mo.carousel([
+            mo.lazy(lambda g=g: _build([g]), show_loading_indicator=True) for g in groups
+        ])
+
+    return cost_view, describe_view, infer_shape, select_groups
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Reset buttons (one per section)
-# ─────────────────────────────────────────────────────────────────────────────
 @app.cell(hide_code=True)
 def _(mo):
     get_violin_reset, _set_violin_reset = mo.state(0)
@@ -235,16 +305,13 @@ def _(mo):
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# SECTION 1 · Final-state statistics (violin plots)
-# ═════════════════════════════════════════════════════════════════════════════
 @app.cell(hide_code=True)
-def _(HORIZONS, datasets, get_violin_reset, mo):
+def _(HORIZONS, get_df, get_violin_reset, mo):
     get_violin_reset()  # re-running this cell after a reset restores every default
 
-    _groups = [g for g in datasets[f"earth_{HORIZONS[-1]}"]["Group"].unique() if g != "Full"]
-    _panels = ["Slew time", "Final angle error", "Final angular velocity", "Success rate"]
     _default_h = 200 if 200 in HORIZONS else HORIZONS[-1]
+    _groups = [g for g in get_df("earth", _default_h)["Group"].unique() if g != "Full"]
+    _panels = ["Slew time", "Final angle error", "Final angular velocity", "Success rate"]
 
     # Default comparison: "Adapt" against "Fixed" when those groups exist
     _by_lower = {str(g).lower(): g for g in _groups}
@@ -287,10 +354,10 @@ def _(HORIZONS, datasets, get_violin_reset, mo):
 
 
 @app.cell(hide_code=True)
-def _(datasets, mo, np, v_horizon):
+def _(get_df, mo, np, v_horizon):
     # Controls whose range depends on the selected horizon
     _h = v_horizon.value
-    _frames = [datasets[f"earth_{_h}"], datasets[f"uranus_{_h}"]]
+    _frames = [get_df("earth", _h), get_df("uranus", _h)]
     _t_max = max(float(f["Time"].max()) for f in _frames)
     _n_steps = int(_frames[0]["Time"].nunique())
 
@@ -364,7 +431,7 @@ def _(
 
 @app.cell(hide_code=True)
 def _(
-    datasets,
+    get_df,
     infer_shape,
     mo,
     np,
@@ -396,7 +463,7 @@ def _(
     # ── Per-trajectory statistics for both datasets ──────────────────────────
     _stats, _frames = [], []
     for _body in ("earth", "uranus"):
-        _df = select_groups(datasets[f"{_body}_{_horizon}"], v_groups.value)
+        _df = select_groups(get_df(_body, _horizon), v_groups.value)
         _frames.append(_df)
         _batch, _n_steps = infer_shape(_df)
         _stats.append(
@@ -553,6 +620,294 @@ def _(
         plt.close(_fig)
     _out
     return
+
+
+@app.cell(hide_code=True)
+def _(HORIZONS, get_cost_reset, get_df, mo):
+    get_cost_reset()  # re-running this cell after a reset restores every default
+
+    _default_h = 200 if 200 in HORIZONS else HORIZONS[-1]
+    _groups = [g for g in get_df("earth", _default_h)["Group"].unique() if g != "Full"]
+    _slider = dict(show_value=True, debounce=True, full_width=True)
+
+    c_horizon = mo.ui.dropdown(
+        options={f"N = {h}": h for h in HORIZONS}, value=f"N = {_default_h}",
+        label="Horizon", full_width=True,
+    )
+    c_bodies = mo.ui.multiselect(
+        options=["Earth", "Uranus"], value=["Earth", "Uranus"], label="Datasets", full_width=True,
+    )
+    c_groups = mo.ui.multiselect(options=_groups, value=_groups, label="Groups", full_width=True)
+
+    c_compare = mo.ui.switch(value=False, label="Overlay groups on shared axes")
+    c_stats = mo.ui.switch(value=True, label="Show summary statistics")
+    c_traj_mode = mo.ui.dropdown(
+        options=["All trajectories", "Single trajectory"], value="All trajectories",
+        label="Trajectories", full_width=True,
+    )
+
+    c_angle_thr = mo.ui.slider(0.1, 90, value=15.0, step=0.1, label="Angle threshold (deg)", **_slider)
+    c_omega_thr = mo.ui.slider(0.1, 30, value=5.0, step=0.1, label="Rate threshold (deg/s)", **_slider)
+    c_show_thr = mo.ui.switch(value=True, label="Show threshold lines")
+    c_fit_y = mo.ui.switch(value=True, label="Fit y-axis to time window")
+    return (
+        c_angle_thr,
+        c_bodies,
+        c_compare,
+        c_fit_y,
+        c_groups,
+        c_horizon,
+        c_omega_thr,
+        c_show_thr,
+        c_stats,
+        c_traj_mode,
+    )
+
+
+@app.cell(hide_code=True)
+def _(c_horizon, get_df, infer_shape, mo, np):
+    # Controls whose range depends on the selected horizon
+    _h = c_horizon.value
+    _frames = [get_df(b, _h) for b in ("earth", "uranus")]
+    _times = np.sort(_frames[0]["Time"].unique())
+    _steps = list(dict.fromkeys(float(t) for t in np.round(_times, 3)))
+    _batch = min(infer_shape(f)[0] for f in _frames)
+
+    c_time = mo.ui.range_slider(
+        steps=_steps, value=[_steps[0], _steps[-1]], show_value=True, debounce=True,
+        full_width=True, label="Time window (s)",
+    )
+    c_traj_idx = mo.ui.slider(
+        0, max(_batch - 1, 0), value=0, step=1, show_value=True, debounce=True,
+        full_width=True, label="Trajectory index",
+    )
+    return c_time, c_traj_idx
+
+
+@app.cell(hide_code=True)
+def _(
+    c_angle_thr,
+    c_bodies,
+    c_compare,
+    c_fit_y,
+    c_groups,
+    c_horizon,
+    c_omega_thr,
+    c_show_thr,
+    c_stats,
+    c_time,
+    c_traj_idx,
+    c_traj_mode,
+    cost_reset_btn,
+    mo,
+):
+    _traj_controls = [c_traj_mode]
+    if c_traj_mode.value == "Single trajectory":
+        _traj_controls.append(c_traj_idx)  # only shown when it has an effect
+
+    mo.vstack([
+        mo.md(
+            "---\n## 2 · Error Trajectories: Earth vs. Uranus\n"
+            "Angle and angular-velocity error histories. Groups are paged through in a carousel by "
+            "default; overlay them to compare directly. Inspect all trajectories or a single one."
+        ),
+        mo.hstack([c_horizon, c_bodies, c_groups], widths="equal", align="start", gap=2),
+        mo.hstack(
+            [
+                mo.vstack([mo.md("**View**"), c_compare, c_stats, *_traj_controls]),
+                mo.vstack([mo.md("**Thresholds**"), c_angle_thr, c_omega_thr, c_show_thr]),
+                mo.vstack([mo.md("**Time window**"), c_time, c_fit_y]),
+            ],
+            widths="equal", align="start", gap=2,
+        ),
+        mo.hstack([cost_reset_btn], justify="end"),
+    ], gap=1.25)
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    c_angle_thr,
+    c_bodies,
+    c_compare,
+    c_fit_y,
+    c_groups,
+    c_horizon,
+    c_omega_thr,
+    c_show_thr,
+    c_stats,
+    c_time,
+    c_traj_idx,
+    c_traj_mode,
+    cost_view,
+    describe_view,
+    get_df,
+    infer_shape,
+    mo,
+    select_groups,
+):
+    mo.stop(not c_bodies.value, mo.callout("Select at least one dataset to display.", kind="warn"))
+    mo.stop(not c_groups.value, mo.callout("Select at least one group to display.", kind="warn"))
+    _t_lo, _t_hi = c_time.value
+    mo.stop(_t_hi <= _t_lo, mo.callout("Choose a time window with a non-zero width.", kind="warn"))
+
+    _horizon = c_horizon.value
+    _single = c_traj_mode.value == "Single trajectory"
+    _idx = int(c_traj_idx.value) if _single else None
+    _bodies = [b for b in ("Earth", "Uranus") if b in c_bodies.value]
+    _frames = {b: select_groups(get_df(b.lower(), _horizon), c_groups.value) for b in _bodies}
+    _batch = min(infer_shape(f)[0] for f in _frames.values())
+    _opts = dict(
+        compare_groups=c_compare.value, batch_idx=_idx,
+        angle_thr=c_angle_thr.value, omega_thr=c_omega_thr.value,
+        t_window=(_t_lo, _t_hi), plot_stats=c_stats.value,
+        show_thresholds=c_show_thr.value, fit_y=c_fit_y.value,
+    )
+
+    _n_groups = len(c_groups.value)
+    _traj_text = f"trajectory #{_idx}" if _single else f"all {_batch} trajectories per group"
+    _summary = mo.md(
+        f"Showing **{' & '.join(_bodies)}** at horizon **N = {_horizon}** · "
+        f"{_n_groups} group{'s' if _n_groups != 1 else ''} · {_traj_text} · "
+        f"window **{_t_lo:g}–{_t_hi:g} s**  \n"
+        f"_{describe_view(c_compare.value, c_stats.value)}_"
+    )
+
+    # Figures are only drawn once this section scrolls into view
+    _view = mo.lazy(lambda: cost_view(_frames, label_sources=True, **_opts), show_loading_indicator=True)
+    mo.vstack([_summary, _view], gap=1.5)
+    return
+
+
+@app.cell(hide_code=True)
+def _(get_torque, get_torque_reset, infer_shape, mo, np):
+    get_torque_reset()  # re-running this cell after a reset restores every default
+
+    _df = get_torque()
+    _groups = list(_df["Group"].unique())
+    _batch, _ = infer_shape(_df)
+    _times = np.sort(_df["Time"].unique())
+    _steps = list(dict.fromkeys(float(t) for t in np.round(_times, 3)))
+    _hi = max([t for t in _steps if t <= 80.0], default=_steps[-1])  # original default: 80 s
+    _slider = dict(show_value=True, debounce=True, full_width=True)
+
+    tq_groups = mo.ui.multiselect(options=_groups, value=_groups, label="Groups", full_width=True)
+    tq_compare = mo.ui.switch(value=True, label="Overlay groups on shared axes")
+    tq_stats = mo.ui.switch(value=False, label="Show summary statistics")
+    tq_traj_mode = mo.ui.dropdown(
+        options=["All trajectories", "Single trajectory"], value="All trajectories",
+        label="Trajectories", full_width=True,
+    )
+    tq_traj_idx = mo.ui.slider(
+        0, max(_batch - 1, 0), value=0, step=1, label="Trajectory index", **_slider,
+    )
+
+    tq_angle_thr = mo.ui.slider(0.1, 90, value=15.0, step=0.1, label="Angle threshold (deg)", **_slider)
+    tq_omega_thr = mo.ui.slider(0.1, 30, value=5.0, step=0.1, label="Rate threshold (deg/s)", **_slider)
+    tq_show_thr = mo.ui.switch(value=True, label="Show threshold lines")
+    tq_fit_y = mo.ui.switch(value=True, label="Fit y-axis to time window")
+    tq_time = mo.ui.range_slider(
+        steps=_steps, value=[_steps[0], _hi], label="Time window (s)", **_slider,
+    )
+    return (
+        tq_angle_thr,
+        tq_compare,
+        tq_fit_y,
+        tq_groups,
+        tq_omega_thr,
+        tq_show_thr,
+        tq_stats,
+        tq_time,
+        tq_traj_idx,
+        tq_traj_mode,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    mo,
+    torque_reset_btn,
+    tq_angle_thr,
+    tq_compare,
+    tq_fit_y,
+    tq_groups,
+    tq_omega_thr,
+    tq_show_thr,
+    tq_stats,
+    tq_time,
+    tq_traj_idx,
+    tq_traj_mode,
+):
+    _traj_controls = [tq_traj_mode]
+    if tq_traj_mode.value == "Single trajectory":
+        _traj_controls.append(tq_traj_idx)  # only shown when it has an effect
+
+    mo.vstack([
+        mo.md(
+            "---\n## 3 · Torque vs. Dipole\n"
+            "Angle and angular-velocity error histories for the torque comparison dataset."
+        ),
+        mo.hstack(
+            [
+                mo.vstack([mo.md("**View**"), tq_groups, tq_compare, tq_stats, *_traj_controls]),
+                mo.vstack([mo.md("**Thresholds**"), tq_angle_thr, tq_omega_thr, tq_show_thr]),
+                mo.vstack([mo.md("**Time window**"), tq_time, tq_fit_y]),
+            ],
+            widths="equal", align="start", gap=2,
+        ),
+        mo.hstack([torque_reset_btn], justify="end"),
+    ], gap=1.25)
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    cost_view,
+    describe_view,
+    get_torque,
+    infer_shape,
+    mo,
+    select_groups,
+    tq_angle_thr,
+    tq_compare,
+    tq_fit_y,
+    tq_groups,
+    tq_omega_thr,
+    tq_show_thr,
+    tq_stats,
+    tq_time,
+    tq_traj_idx,
+    tq_traj_mode,
+):
+    mo.stop(not tq_groups.value, mo.callout("Select at least one group to display.", kind="warn"))
+    _t_lo, _t_hi = tq_time.value
+    mo.stop(_t_hi <= _t_lo, mo.callout("Choose a time window with a non-zero width.", kind="warn"))
+
+    _df = select_groups(get_torque(), tq_groups.value)
+    _batch, _ = infer_shape(_df)
+    _single = tq_traj_mode.value == "Single trajectory"
+    _idx = int(tq_traj_idx.value) if _single else None
+    _opts = dict(
+        compare_groups=tq_compare.value, batch_idx=_idx,
+        angle_thr=tq_angle_thr.value, omega_thr=tq_omega_thr.value,
+        t_window=(_t_lo, _t_hi), plot_stats=tq_stats.value,
+        show_thresholds=tq_show_thr.value, fit_y=tq_fit_y.value,
+    )
+
+    _names = ", ".join(str(g) for g in tq_groups.value)
+    _traj_text = f"trajectory #{_idx}" if _single else f"all {_batch} trajectories per group"
+    _summary = mo.md(
+        f"Showing **{_names}** · {_traj_text} · window **{_t_lo:g}–{_t_hi:g} s**  \n"
+        f"_{describe_view(tq_compare.value, tq_stats.value)}_"
+    )
+
+    # Figures are only drawn once this section scrolls into view
+    _view = mo.lazy(
+        lambda: cost_view({"Torque": _df}, label_sources=False, **_opts), show_loading_indicator=True
+    )
+    mo.vstack([_summary, _view], gap=1.5)
+    return
+
 
 if __name__ == "__main__":
     app.run()
