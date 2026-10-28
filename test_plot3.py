@@ -10,7 +10,7 @@
 import marimo
 
 __generated_with = "0.24.2"
-app = marimo.App(width="full", app_title="Attitude Slew Explorer")
+app = marimo.App(app_title="Adaptive Magnetorquer-Only Control")
 
 
 @app.cell(hide_code=True)
