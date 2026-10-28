@@ -168,7 +168,7 @@ def plot_traj(
         ax.legend()
   if title is not None:
     axes_list[0].set_title(title)
-  plt.show()
+   
   return [fig]
 
 def plot_costs(
@@ -268,7 +268,7 @@ def plot_costs(
             plt.tight_layout()
             if filename is not None:
                 plt.savefig('figures/' + 'costs_compared' + m["suffix"] + '_' + filename)
-            plt.show()
+             
 
     else:
         # Plot each group on their own plot
@@ -351,7 +351,7 @@ def plot_costs(
                 plt.tight_layout()
                 if filename is not None:
                   plt.savefig('figures/' + 'costs_'+ group.lower() + m["suffix"] +  '_' + filename)
-                plt.show()
+                 
 
     return df, figs
 
@@ -391,7 +391,7 @@ def plot_kde(
     plt.tight_layout()
     if filename is not None:
         plt.savefig('figures/kde_slew_time_' + filename)
-    plt.show()
+     
 
     # --- Figure 2: Final Principal Angle Error ---
     fig2, ax2 = plt.subplots(figsize=(6, 5))
@@ -402,7 +402,7 @@ def plot_kde(
     plt.tight_layout()
     if filename is not None:
         plt.savefig('figures/kde_angle_error_' + filename)
-    plt.show()
+     
 
     # --- Figure 3: Final Omega Error ---
     fig3, ax3 = plt.subplots(figsize=(6, 5))
@@ -413,7 +413,7 @@ def plot_kde(
     plt.tight_layout()
     if filename is not None:
         plt.savefig('figures/kde_omega_error_' + filename)
-    plt.show()
+     
 
     if verbose:
         for g in range(n_groups):
@@ -490,7 +490,7 @@ def plot_violin_and_bar(
     finalize_violin_axes(ax1)
     plt.tight_layout()
     if filename is not None: plt.savefig('figures/violin_slew_' + filename)
-    plt.show()
+     
 
     # --- Figure 2: Final Principal Angle Error ---
     fig2, ax2 = plt.subplots(figsize=(6, 5))
@@ -503,7 +503,7 @@ def plot_violin_and_bar(
     finalize_violin_axes(ax2)
     plt.tight_layout()
     if filename is not None: plt.savefig('figures/violin_angle_' + filename)
-    plt.show()
+     
 
     # --- Figure 3: Final Omega Error ---
     fig3, ax3 = plt.subplots(figsize=(6, 5))
@@ -516,7 +516,7 @@ def plot_violin_and_bar(
     finalize_violin_axes(ax3)
     plt.tight_layout()
     if filename is not None: plt.savefig('figures/violin_omega_' + filename)
-    plt.show()
+     
 
     # --- Collect Data for Success Rate & Mean Plots ---
     success_data = []
@@ -565,7 +565,7 @@ def plot_violin_and_bar(
     finalize_violin_axes(ax4)
     plt.tight_layout()
     if filename is not None: plt.savefig('figures/bar_success_' + filename)
-    plt.show()
+     
 
     group_figs: list[Figure] = []
     if plot_bar_by_group:
@@ -600,7 +600,7 @@ def plot_violin_and_bar(
           
           if filename is not None: 
               plt.savefig(f'figures/bar_success_{target_group}_' + filename)
-          plt.show()
+           
 
     # # --- Figure 5: Mean Final Angle Error Bar Plot ---
     # fig5, ax5 = plt.subplots(figsize=(10, 5))
@@ -611,7 +611,7 @@ def plot_violin_and_bar(
     # finalize_violin_axes(ax5)
     # plt.tight_layout()
     # if filename is not None: plt.savefig('figures/bar_angle_error_' + filename)
-    # plt.show()
+    #  
 
     # # --- Figure 6: Mean Final Omega Error Bar Plot ---
     # fig6, ax6 = plt.subplots(figsize=(10, 5))
@@ -622,7 +622,7 @@ def plot_violin_and_bar(
     # finalize_violin_axes(ax6)
     # plt.tight_layout()
     # if filename is not None: plt.savefig('figures/bar_omega_error_' + filename)
-    # plt.show()
+    #  
 
     return stats_df, [fig1, fig2, fig3, fig4, *group_figs]
 
@@ -694,5 +694,5 @@ def plot_3D(trajectory: NDArray) -> list[Figure]:
   ax.set_zlim([-max_range, max_range])
   
   plt.tight_layout()
-  plt.show()
+   
   return [fig]
