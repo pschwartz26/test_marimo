@@ -42,13 +42,14 @@ def _():
 def _(mo):
     mo.md(r"""
     Interactive analysis of slew-maneuver results for the **Earth** and **Uranus** datasets
-    across several horizons, plus a **torque vs. dipole** comparison. 
+    across several horizons, plus a **torque vs. dipole** comparison. Every section has its own
+    controls, and plots and summaries update as you change them.
 
     | Section | What it shows |
     |:--|:--|
     | **1 · Final-state statistics** | Violin plots and success / stability statistics, Earth vs. Uranus |
-    | **2 · Error trajectories** | Angle and angular-velocity error trajectories, Earth vs. Uranus |
-    | **3 · Torque vs. dipole** | Angle and angular-velocity error trajectories for the torque comparison |
+    | **2 · Error trajectories** | Angle and angular-velocity error histories, Earth vs. Uranus |
+    | **3 · Torque vs. dipole** | Angle and angular-velocity error histories for the torque comparison |
     """)
     return
 
@@ -64,7 +65,7 @@ def _(mo, np, pd):
     # pickles. After uploading the .npz files somewhere that serves them with CORS
     # (e.g. GitHub -> raw.githubusercontent.com), put the folder URL here.
     # Leave as None to fall back to the original pickles.
-    COMPACT_BASE = "https://github.com/JHU-ACEL/uranus-mpc-data/blob/main/compact"  # e.g. "https://raw.githubusercontent.com/<user>/<repo>/main/compact"
+    COMPACT_BASE = "https://github.com/JHU-ACEL/uranus-mpc-data/blob/main/compact" 
 
     PICKLE_BASE = "https://raw.githubusercontent.com/JHU-ACEL/uranus-mpc-data/main/data"
     HORIZONS = [50, 100, 150, 200, 250]
@@ -196,6 +197,15 @@ def _(mo, np, plot_utils, plt):
         keys = ["All groups"] if compare_groups else list(df["Group"].unique())
         return {key: (figs[2 * i], figs[2 * i + 1]) for i, key in enumerate(keys)}
 
+    def control_grid(items, cols=2):
+        """Lay controls out in rows of `cols` equal-width columns (holds up at any page width)."""
+        rows = []
+        for i in range(0, len(items), cols):
+            chunk = list(items[i:i + cols])
+            chunk += [mo.md("")] * (cols - len(chunk))
+            rows.append(mo.hstack(chunk, widths="equal", align="start", gap=2))
+        return mo.vstack(rows, gap=0.75)
+
     def _caption(text, fig):
         return mo.vstack([mo.md(f"**{text}**"), fig], align="center", gap=0.25)
 
@@ -271,7 +281,7 @@ def _(mo, np, plot_utils, plt):
             mo.lazy(lambda g=g: _build([g]), show_loading_indicator=True) for g in groups
         ])
 
-    return cost_view, describe_view, infer_shape, select_groups
+    return control_grid, cost_view, describe_view, infer_shape, select_groups
 
 
 @app.cell(hide_code=True)
@@ -300,6 +310,18 @@ def _(mo):
         torque_reset_btn,
         violin_reset_btn,
     )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ---
+    ## 1 · Final-State Statistics
+    "
+        "Distributions of slew time and converged error across trajectories, Earth vs. Uranus. "
+        "Use **Interact with data** beneath the plots to change the horizon, groups, criteria and panels.
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -372,58 +394,6 @@ def _(get_df, mo, np, v_horizon):
         full_width=True, label="Stability: minimum stable samples",
     )
     return v_tail, v_time_cap
-
-
-@app.cell(hide_code=True)
-def _(
-    mo,
-    v_angle_cap,
-    v_angle_thr,
-    v_angle_tol,
-    v_baseline,
-    v_compare,
-    v_groups,
-    v_horizon,
-    v_omega_cap,
-    v_omega_thr,
-    v_omega_tol,
-    v_panels,
-    v_tail,
-    v_time_cap,
-    violin_reset_btn,
-):
-    _definitions = mo.accordion({
-        "Definitions: stability, slew time and success": mo.md(
-            "A trajectory is **stable** if its final contiguous segment stays within the angle and "
-            "rate tolerances of the *tail means* (averages over the last *minimum stable samples*) "
-            "for at least that many samples. **Slew time** is the time at which that final segment "
-            "begins. A trajectory is a **success** if it is stable *and* its tail-mean angle error "
-            "and rate error are both below the success thresholds. Statistics always use the full "
-            "trajectories, independent of the plot axis limits."
-        )
-    })
-
-    mo.vstack([
-        mo.md(
-            "---\n## 1 · Final-State Statistics\n"
-            "Distributions of slew time and converged error across trajectories, Earth vs. Uranus. "
-            "Pick a horizon and groups, tune the success and stability criteria, choose which groups to "
-            "compare, and select which panels to display."
-        ),
-        mo.hstack([v_horizon, v_groups, v_panels], widths="equal", align="start", gap=2),
-        mo.hstack(
-            [
-                mo.vstack([mo.md("**Success criteria**"), v_angle_thr, v_omega_thr]),
-                mo.vstack([mo.md("**Group comparison**"), v_compare, v_baseline]),
-                mo.vstack([mo.md("**Stability detection**"), v_angle_tol, v_omega_tol, v_tail]),
-                mo.vstack([mo.md("**Plot limits**"), v_time_cap, v_angle_cap, v_omega_cap]),
-            ],
-            widths="equal", align="start", gap=2,
-        ),
-        _definitions,
-        mo.hstack([violin_reset_btn], justify="end"),
-    ], gap=1.25)
-    return
 
 
 @app.cell(hide_code=True)
@@ -530,8 +500,7 @@ def _(
     # ── Results table ────────────────────────────────────────────────────────
     _group_names = list(dict.fromkeys(g for s in _stats for g in s["Group"].unique()))
     _lines = [
-        "| Group | Dataset | Success rate | Stable rate | Mean slew time (s) "
-        "| Mean final angle error (deg) | Mean final angular velocity (deg/s) |",
+        "| Group | Dataset | Success | Stable | Slew time (s) | Angle err. (deg) | Rate err. (deg/s) |",
         "|:--|:--|--:|--:|--:|--:|--:|",
     ]
 
@@ -554,9 +523,6 @@ def _(
         _unique_best = sum(p["success"] == _best for p in _per.values()) == 1 and len(_per) > 1
         for _lab, _p in _per.items():
             _lines.append(_row(_g, _lab, _p, bold_success=_unique_best and _p["success"] == _best))
-    if len(_group_names) > 1:
-        for _lab in _labels:
-            _lines.append(_row("*All groups*", _lab, _pooled[_lab]))
 
     # ── Group-comparison badges (one per planet) ─────────────────────────────
     _cmp, _base = v_compare.value, v_baseline.value
@@ -591,23 +557,25 @@ def _(
         _badges = mo.hstack([_badge(_lab) for _lab in _labels], justify="start", gap=1)
 
     _n_groups = len(_group_names)
+    _title_md = mo.md(f"### Results: N = {_horizon} steps")
     _header_md = mo.md(
-        f"### Results · horizon N = {_horizon} ({_t_end:g} s)\n\n"
         f"**Success:** stable, with converged angle error < **{_a_thr:g}°** and "
         f"angular-velocity error < **{_w_thr:g}°/s**.  \n"
         f"**Stable:** final segment stays within **±{_a_tol:g}°** and **±{_w_tol:g}°/s** of the "
         f"tail means for at least **{_tail}** samples.  \n"
         f"{_n_groups} group{'s' if _n_groups != 1 else ''} × {_batch} trajectories per dataset."
     )
+
     _footnote = mo.md(
-        "_Badges show the success-rate difference between the two selected groups, in percentage points (pp), "
+        "_Slew time, angle and rate columns are means. Badges show the success-rate difference between the two selected groups, in percentage points (pp), "
         "for each dataset. In the table, bold marks the higher success rate within a group. Axis limits affect the plots only; "
         "all statistics use the full trajectories. The aggregate “Full” group is excluded._"
     )
 
     _out = mo.vstack([
-        _header_md,
+        _title_md, 
         _badges,
+        _header_md,
         mo.hstack(_panels, justify="center", gap=1, wrap=True),
         mo.md("\n".join(_lines)),
         _footnote,
@@ -616,6 +584,66 @@ def _(
     for _fig in _figs:
         plt.close(_fig)
     _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    control_grid,
+    mo,
+    v_angle_cap,
+    v_angle_thr,
+    v_angle_tol,
+    v_baseline,
+    v_compare,
+    v_groups,
+    v_horizon,
+    v_omega_cap,
+    v_omega_thr,
+    v_omega_tol,
+    v_panels,
+    v_tail,
+    v_time_cap,
+    violin_reset_btn,
+):
+    _controls = mo.vstack([
+        mo.md("**Data & display**"),
+        control_grid([v_horizon, v_groups, v_panels]),
+        mo.md("**Group comparison**"),
+        control_grid([v_compare, v_baseline]),
+        mo.md("**Success criteria**"),
+        control_grid([v_angle_thr, v_omega_thr]),
+        mo.md("**Stability detection**"),
+        control_grid([v_angle_tol, v_omega_tol, v_tail]),
+        mo.md("**Plot limits**"),
+        control_grid([v_time_cap, v_angle_cap, v_omega_cap]),
+        mo.hstack([violin_reset_btn], justify="end"),
+    ], gap=1)
+
+    mo.accordion({
+        "Interact with data": _controls,
+        "Definitions: stability, slew time, and success": mo.md(
+            "A trajectory is **stable** if its final contiguous segment stays within the angle and "
+            "rate tolerances of the *tail means* (averages over the last *minimum stable samples*) "
+            "for at least that many samples. **Slew time** is the time at which that final segment "
+            "begins. A trajectory is a **success** if it is stable *and* its tail-mean angle error "
+            "and rate error are both below the success thresholds. Statistics always use the full "
+            "trajectories, independent of the plot axis limits."
+        ),
+    }, multiple=True)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ---
+    ## 2 · Error Trajectories: Earth vs. Uranus
+    "
+        "Angle and angular-velocity error histories. Groups are paged through in a carousel by "
+        "default; overlay them to compare directly. Use **Interact with data** beneath the plots to "
+        "change the view, thresholds and time window.
+    """)
     return
 
 
@@ -695,47 +723,6 @@ def _(
     c_time,
     c_traj_idx,
     c_traj_mode,
-    cost_reset_btn,
-    mo,
-):
-    _traj_controls = [c_traj_mode]
-    if c_traj_mode.value == "Single trajectory":
-        _traj_controls.append(c_traj_idx)  # only shown when it has an effect
-
-    mo.vstack([
-        mo.md(
-            "---\n## 2 · Error Trajectories: Earth vs. Uranus\n"
-            "Angle and angular-velocity error histories. Groups are paged through in a carousel by "
-            "default; overlay them to compare directly. Inspect all trajectories or a single one."
-        ),
-        mo.hstack([c_horizon, c_bodies, c_groups], widths="equal", align="start", gap=2),
-        mo.hstack(
-            [
-                mo.vstack([mo.md("**View**"), c_compare, c_stats, *_traj_controls]),
-                mo.vstack([mo.md("**Thresholds**"), c_angle_thr, c_omega_thr, c_show_thr]),
-                mo.vstack([mo.md("**Time window**"), c_time, c_fit_y]),
-            ],
-            widths="equal", align="start", gap=2,
-        ),
-        mo.hstack([cost_reset_btn], justify="end"),
-    ], gap=1.25)
-    return
-
-
-@app.cell(hide_code=True)
-def _(
-    c_angle_thr,
-    c_bodies,
-    c_compare,
-    c_fit_y,
-    c_groups,
-    c_horizon,
-    c_omega_thr,
-    c_show_thr,
-    c_stats,
-    c_time,
-    c_traj_idx,
-    c_traj_mode,
     cost_view,
     describe_view,
     get_df,
@@ -773,6 +760,57 @@ def _(
     # Figures are only drawn once this section scrolls into view
     _view = mo.lazy(lambda: cost_view(_frames, label_sources=True, **_opts), show_loading_indicator=True)
     mo.vstack([_summary, _view], gap=1.5)
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    c_angle_thr,
+    c_bodies,
+    c_compare,
+    c_fit_y,
+    c_groups,
+    c_horizon,
+    c_omega_thr,
+    c_show_thr,
+    c_stats,
+    c_time,
+    c_traj_idx,
+    c_traj_mode,
+    control_grid,
+    cost_reset_btn,
+    mo,
+):
+    _traj_controls = [c_traj_mode]
+    if c_traj_mode.value == "Single trajectory":
+        _traj_controls.append(c_traj_idx)  # only shown when it has an effect
+
+    mo.accordion({
+        "Interact with data": mo.vstack([
+            mo.md("**Data**"),
+            control_grid([c_horizon, c_bodies, c_groups]),
+            mo.md("**View**"),
+            control_grid([c_compare, c_stats]),
+            control_grid(_traj_controls),
+            mo.md("**Thresholds and time window**"),
+            control_grid([c_angle_thr, c_omega_thr]),
+            control_grid([c_show_thr, c_fit_y]),
+            control_grid([c_time], cols=1),
+            mo.hstack([cost_reset_btn], justify="end"),
+        ], gap=1)
+    })
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ---
+    ## 3 · Torque vs. Dipole
+    "
+        "Angle and angular-velocity error histories for the torque comparison dataset. "
+        "Use **Interact with data** beneath the plots to change the view, thresholds and time window.
+    """)
     return
 
 
@@ -818,43 +856,6 @@ def _(get_torque, get_torque_reset, infer_shape, mo, np):
         tq_traj_idx,
         tq_traj_mode,
     )
-
-
-@app.cell(hide_code=True)
-def _(
-    mo,
-    torque_reset_btn,
-    tq_angle_thr,
-    tq_compare,
-    tq_fit_y,
-    tq_groups,
-    tq_omega_thr,
-    tq_show_thr,
-    tq_stats,
-    tq_time,
-    tq_traj_idx,
-    tq_traj_mode,
-):
-    _traj_controls = [tq_traj_mode]
-    if tq_traj_mode.value == "Single trajectory":
-        _traj_controls.append(tq_traj_idx)  # only shown when it has an effect
-
-    mo.vstack([
-        mo.md(
-            "---\n## 3 · Torque vs. Dipole\n"
-            "Angle and angular-velocity error histories for the torque comparison dataset."
-        ),
-        mo.hstack(
-            [
-                mo.vstack([mo.md("**View**"), tq_groups, tq_compare, tq_stats, *_traj_controls]),
-                mo.vstack([mo.md("**Thresholds**"), tq_angle_thr, tq_omega_thr, tq_show_thr]),
-                mo.vstack([mo.md("**Time window**"), tq_time, tq_fit_y]),
-            ],
-            widths="equal", align="start", gap=2,
-        ),
-        mo.hstack([torque_reset_btn], justify="end"),
-    ], gap=1.25)
-    return
 
 
 @app.cell(hide_code=True)
@@ -906,6 +907,42 @@ def _(
     return
 
 
+@app.cell(hide_code=True)
+def _(
+    control_grid,
+    mo,
+    torque_reset_btn,
+    tq_angle_thr,
+    tq_compare,
+    tq_fit_y,
+    tq_groups,
+    tq_omega_thr,
+    tq_show_thr,
+    tq_stats,
+    tq_time,
+    tq_traj_idx,
+    tq_traj_mode,
+):
+    _traj_controls = [tq_traj_mode]
+    if tq_traj_mode.value == "Single trajectory":
+        _traj_controls.append(tq_traj_idx)  # only shown when it has an effect
+
+    mo.accordion({
+        "Interact with data": mo.vstack([
+            mo.md("**Data**"),
+            control_grid([tq_groups], cols=1),
+            mo.md("**View**"),
+            control_grid([tq_compare, tq_stats]),
+            control_grid(_traj_controls),
+            mo.md("**Thresholds and time window**"),
+            control_grid([tq_angle_thr, tq_omega_thr]),
+            control_grid([tq_show_thr, tq_fit_y]),
+            control_grid([tq_time], cols=1),
+            mo.hstack([torque_reset_btn], justify="end"),
+        ], gap=1)
+    })
+    return
+
+
 if __name__ == "__main__":
     app.run()
-
