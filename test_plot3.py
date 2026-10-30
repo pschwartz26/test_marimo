@@ -38,20 +38,20 @@ def _():
     return mo, np, pd, plot_utils, plt
 
 
-# @app.cell(hide_code=True)
-# def _(mo):
-#     mo.md(r"""
-#     Interactive analysis of slew-maneuver results for the **Earth** and **Uranus** datasets
-#     across several horizons, plus a **torque vs. dipole** comparison. Every section has its own
-#     controls, and plots and summaries update as you change them.
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Interactive analysis of slew-maneuver results for the **Earth** and **Uranus** datasets
+    across several horizons, plus a **torque vs. dipole** comparison. Every section has its own
+    controls, and plots and summaries update as you change them.
 
-#     | Section | What it shows |
-#     |:--|:--|
-#     | **1 · Final-state statistics** | Violin plots and success / stability statistics, Earth vs. Uranus |
-#     | **2 · Error trajectories** | Angle and angular-velocity error histories, Earth vs. Uranus |
-#     | **3 · Torque vs. dipole** | Angle and angular-velocity error histories for the torque comparison |
-#     """)
-#     return
+    | Section | What it shows |
+    |:--|:--|
+    | **1 · Final-state statistics** | Violin plots and success / stability statistics, Earth vs. Uranus |
+    | **2 · Error trajectories** | Angle and angular-velocity error histories, Earth vs. Uranus |
+    | **3 · Torque vs. dipole** | Angle and angular-velocity error histories for the torque comparison |
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -318,8 +318,8 @@ def _(mo):
     ---
     ## 1 · Final-State Statistics
     "
-        "Distributions of slew time and converged error across trajectories, Earth vs. Uranus. "
-        "Use **Interact with data** beneath the plots to change the horizon, groups, criteria and panels.
+        Distributions of slew time and converged error across trajectories, Earth vs. Uranus.
+        Use **Interact with data** beneath the plots to change the horizon, groups, criteria and panels.
     """)
     return
 
@@ -536,10 +536,8 @@ def _(
         c, b = _by_planet[label][_cmp]["success"], _by_planet[label][_base]["success"]
         delta = c - b
         caption = f"{_cmp} {c:.1f}% vs {_base} {b:.1f}%"
-        if b > 0:
-            caption += f" · {delta / b * 100:+.0f}% relative"
         return mo.stat(
-            value=f"{delta:+.1f} pp",
+            value=f"{delta:+.1f} %",
             label=f"{label} · {_cmp} vs {_base}",
             caption=caption,
             direction=None if delta == 0 else ("increase" if delta > 0 else "decrease"),
@@ -664,7 +662,7 @@ def _(HORIZONS, get_cost_reset, get_df, mo):
     )
     c_groups = mo.ui.multiselect(options=_groups, value=_groups, label="Groups", full_width=True)
 
-    c_compare = mo.ui.switch(value=False, label="Overlay groups on shared axes")
+    c_compare = mo.ui.switch(value=True, label="Overlay groups on shared axes")
     c_stats = mo.ui.switch(value=True, label="Show summary statistics")
     c_traj_mode = mo.ui.dropdown(
         options=["All trajectories", "Single trajectory"], value="All trajectories",

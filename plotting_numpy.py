@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from pathlib import Path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -125,6 +126,13 @@ def plot_traj(
   # Optional controls
   if controls is not None and controls.ndim < 3:
       controls = np.expand_dims(controls, 0)
+    
+  if controls is not None and controls.shape[0] != n_traj:
+      if controls.shape[0] != 1:
+          raise ValueError(
+              f"controls has batch size {controls.shape[0]}, expected 1 or {n_traj}"
+          )
+      controls = np.broadcast_to(controls, (n_traj, *controls.shape[1:]))
   
   # Colors for trajectories
   # colors = plt.cm.tab10(np.linspace(0.0, 1.0, n_traj))
@@ -267,7 +275,12 @@ def plot_costs(
 
             plt.tight_layout()
             if filename is not None:
-                plt.savefig('figures/' + 'costs_compared' + m["suffix"] + '_' + filename)
+              fig_dir = Path("figures")
+              fig_dir.mkdir(parents=True, exist_ok=True)
+              
+              fname = f"costs_costs_compared{m['suffix']}_{filename}"
+              file_path = fig_dir / fname
+              plt.savefig(file_path)
              
 
     else:
@@ -350,7 +363,12 @@ def plot_costs(
                 
                 plt.tight_layout()
                 if filename is not None:
-                  plt.savefig('figures/' + 'costs_'+ group.lower() + m["suffix"] +  '_' + filename)
+                  fig_dir = Path("figures")
+                  fig_dir.mkdir(parents=True, exist_ok=True)
+                  
+                  fname = f"costs_{group.lower()}{m['suffix']}_{filename}"
+                  file_path = fig_dir / fname
+                  plt.savefig(file_path)
                  
 
     return df, figs
@@ -390,7 +408,12 @@ def plot_kde(
     ax1.set_xlim(0, time_hist_max)
     plt.tight_layout()
     if filename is not None:
-        plt.savefig('figures/kde_slew_time_' + filename)
+        fig_dir = Path("figures")
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        
+        fname = f"kde_slew_time_{filename}"
+        file_path = fig_dir / fname
+        plt.savefig(file_path)
      
 
     # --- Figure 2: Final Principal Angle Error ---
@@ -401,7 +424,12 @@ def plot_kde(
     ax2.set_xlim(0, angle_hist_max)
     plt.tight_layout()
     if filename is not None:
-        plt.savefig('figures/kde_angle_error_' + filename)
+        fig_dir = Path("figures")
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        
+        fname = f"kde_angle_error_{filename}"
+        file_path = fig_dir / fname
+        plt.savefig(file_path)
      
 
     # --- Figure 3: Final Omega Error ---
@@ -412,7 +440,12 @@ def plot_kde(
     ax3.set_xlim(0, omega_hist_max)
     plt.tight_layout()
     if filename is not None:
-        plt.savefig('figures/kde_omega_error_' + filename)
+        fig_dir = Path("figures")
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        
+        fname = f"kde_omega_error_{filename}"
+        file_path = fig_dir / fname
+        plt.savefig(file_path)
      
 
     if verbose:
@@ -489,7 +522,13 @@ def plot_violin_and_bar(
     if n_dfs > 1: ax1.get_legend().set_title("")
     finalize_violin_axes(ax1)
     plt.tight_layout()
-    if filename is not None: plt.savefig('figures/violin_slew_' + filename)
+    if filename is not None: 
+      fig_dir = Path("figures")
+      fig_dir.mkdir(parents=True, exist_ok=True)
+      
+      fname = f"violin_slew_{filename}"
+      file_path = fig_dir / fname
+      plt.savefig(file_path)
      
 
     # --- Figure 2: Final Principal Angle Error ---
@@ -502,7 +541,13 @@ def plot_violin_and_bar(
     if n_dfs > 1: ax2.get_legend().set_title("")
     finalize_violin_axes(ax2)
     plt.tight_layout()
-    if filename is not None: plt.savefig('figures/violin_angle_' + filename)
+    if filename is not None: 
+      fig_dir = Path("figures")
+      fig_dir.mkdir(parents=True, exist_ok=True)
+      
+      fname = f"violin_angle_{filename}"
+      file_path = fig_dir / fname
+      plt.savefig(file_path)
      
 
     # --- Figure 3: Final Omega Error ---
@@ -515,7 +560,13 @@ def plot_violin_and_bar(
     if n_dfs > 1: ax3.get_legend().set_title("")
     finalize_violin_axes(ax3)
     plt.tight_layout()
-    if filename is not None: plt.savefig('figures/violin_omega_' + filename)
+    if filename is not None: 
+      fig_dir = Path("figures")
+      fig_dir.mkdir(parents=True, exist_ok=True)
+      
+      fname = f"violin_omega_{filename}"
+      file_path = fig_dir / fname
+      plt.savefig(file_path)
      
 
     # --- Collect Data for Success Rate & Mean Plots ---
@@ -564,7 +615,13 @@ def plot_violin_and_bar(
     if n_dfs > 1: ax4.get_legend().set_title("")
     finalize_violin_axes(ax4)
     plt.tight_layout()
-    if filename is not None: plt.savefig('figures/bar_success_' + filename)
+    if filename is not None: 
+      fig_dir = Path("figures")
+      fig_dir.mkdir(parents=True, exist_ok=True)
+      
+      fname = f"bar_success_{filename}"
+      file_path = fig_dir / fname
+      plt.savefig(file_path)
      
 
     group_figs: list[Figure] = []
@@ -599,30 +656,12 @@ def plot_violin_and_bar(
           plt.tight_layout()
           
           if filename is not None: 
-              plt.savefig(f'figures/bar_success_{target_group}_' + filename)
-           
-
-    # # --- Figure 5: Mean Final Angle Error Bar Plot ---
-    # fig5, ax5 = plt.subplots(figsize=(10, 5))
-    # sns.barplot(data=success_df, y="Mean Angle Error", ax=ax5, **bar_kwargs)
-    # ax5.set_ylabel(r"Mean $\gamma_e$ (deg)")
-    # ax5.set_xlabel("")
-    # if n_dfs > 1: ax5.get_legend().set_title("")
-    # finalize_violin_axes(ax5)
-    # plt.tight_layout()
-    # if filename is not None: plt.savefig('figures/bar_angle_error_' + filename)
-    #  
-
-    # # --- Figure 6: Mean Final Omega Error Bar Plot ---
-    # fig6, ax6 = plt.subplots(figsize=(10, 5))
-    # sns.barplot(data=success_df, y="Mean Omega Error", ax=ax6, **bar_kwargs)
-    # ax6.set_ylabel(r"Mean $||\omega||$ (deg/s)")
-    # ax6.set_xlabel("")
-    # if n_dfs > 1: ax6.get_legend().set_title("")
-    # finalize_violin_axes(ax6)
-    # plt.tight_layout()
-    # if filename is not None: plt.savefig('figures/bar_omega_error_' + filename)
-    #  
+            fig_dir = Path("figures")
+            fig_dir.mkdir(parents=True, exist_ok=True)
+            
+            fname = f"bar_success_{target_group}_{filename}"
+            file_path = fig_dir / fname
+            plt.savefig(file_path)
 
     return stats_df, [fig1, fig2, fig3, fig4, *group_figs]
 
